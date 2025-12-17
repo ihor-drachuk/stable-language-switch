@@ -39,9 +39,13 @@ if (-not (Test-Administrator)) {
 
     $elevated = Read-Host "Would you like to restart this script as Administrator? (Y/n)"
     if ($elevated -ne 'n' -and $elevated -ne 'N') {
-        $scriptContent = $MyInvocation.MyCommand.ScriptContents
-        $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($scriptContent))
-        Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encodedCommand"
+        # When run via "irm | iex", we need to download again in the elevated process
+        # Using -EncodedCommand to avoid escaping issues with quotes and special characters
+        $scriptUrl = "https://raw.githubusercontent.com/$GitHubUsername/$RepoName/master/install.ps1"
+        $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; irm '$scriptUrl' | iex"
+        $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
+        $encodedCommand = [Convert]::ToBase64String($bytes)
+        Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -EncodedCommand $encodedCommand"
     }
     exit 1
 }
@@ -145,7 +149,7 @@ Write-Host "`nDownloading $fileName..." -ForegroundColor Gray
 
 $installDir = "$env:LOCALAPPDATA\StableLanguageSwitch"
 $installPath = Join-Path $installDir $fileName
-$downloadUrl = "https://raw.githubusercontent.com/$GitHubUsername/$RepoName/main/$fileName"
+$downloadUrl = "https://raw.githubusercontent.com/$GitHubUsername/$RepoName/master/bin/$fileName"
 
 # Create installation directory
 if (-not (Test-Path $installDir)) {
@@ -303,5 +307,5 @@ Write-Host "The script is running in the background. Look for the AutoHotkey ico
 Write-Host "in your system tray (bottom-right corner)." -ForegroundColor Gray
 Write-Host ""
 Write-Host "To uninstall, run:" -ForegroundColor Gray
-Write-Host "  irm https://raw.githubusercontent.com/$GitHubUsername/$RepoName/main/uninstall.ps1 | iex" -ForegroundColor White
+Write-Host "  irm https://raw.githubusercontent.com/$GitHubUsername/$RepoName/master/uninstall.ps1 | iex" -ForegroundColor White
 Write-Host ""

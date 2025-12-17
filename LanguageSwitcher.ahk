@@ -65,6 +65,11 @@ LoadLayoutOrder() {
             layouts.Push(NumGet(hklBuffer, offset, "Ptr"))
         }
     }
+
+    ; Check if layouts were loaded successfully
+    if (layouts.Length = 0) {
+        MsgBox("Failed to load keyboard layouts from registry.`nPlease check your keyboard layouts in Windows Settings.", "Language Switching Error", "Icon!")
+    }
 }
 
 ; ==============================================================================
@@ -73,13 +78,9 @@ LoadLayoutOrder() {
 SwitchToNextLayout() {
     global layouts
 
-    ; Fallback to simple switching if no layouts loaded
-    if (layouts.Length = 0) {
-        PostMessage(0x50, 0x02, 0, , "A")
-        return
-    }
-
-    hwnd := WinGetID("A")
+    ; Get HWND: try focused control first, fallback to active window (for desktop)
+    focusedCtrl := ControlGetFocus("A")
+    hwnd := focusedCtrl ? ControlGetHwnd(focusedCtrl, "A") : WinGetID("A")
     threadId := DllCall("GetWindowThreadProcessId", "Ptr", hwnd, "Ptr", 0, "UInt")
     currentHKL := DllCall("GetKeyboardLayout", "UInt", threadId, "Ptr")
     currentLangId := currentHKL & 0xFFFF

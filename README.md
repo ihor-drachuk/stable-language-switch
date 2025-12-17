@@ -34,7 +34,7 @@ These scripts may override other hotkeys, so pick the one that works best for yo
 One-line PowerShell command for automated setup.
 
 ```powershell
-irm https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/install.ps1 | iex
 ```
 
 ### Manual Installation
@@ -50,10 +50,10 @@ irm https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/main/i
 
 2. **Download your preferred hotkey script:**
 
-   - **Recommended:** Download [`Alt+Shift.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/main/Alt%2BShift.exe) (fewer conflicts with existing shortcuts)
-   - Alternative: Download [`Ctrl+Shift.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/main/Ctrl%2BShift.exe) (blocks Ctrl+Shift+[key] combinations)
-   - Alternative: Download [`F1.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/main/F1.exe) (single key press, but overrides F1 Help function)
-   - Alternative: Download [`CapsLock.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/main/CapsLock.exe) (single key press, but disables CapsLock functionality)
+   - **Recommended:** Download [`Alt+Shift.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/bin/Alt%2BShift.exe) (fewer conflicts with existing shortcuts)
+   - Alternative: Download [`Ctrl+Shift.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/bin/Ctrl%2BShift.exe) (blocks Ctrl+Shift+[key] combinations)
+   - Alternative: Download [`F1.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/bin/F1.exe) (single key press, but overrides F1 Help function)
+   - Alternative: Download [`CapsLock.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/bin/CapsLock.exe) (single key press, but disables CapsLock functionality)
 
 3. **Run the executable:**
 
@@ -71,7 +71,7 @@ irm https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/main/i
 ### Automatic Uninstall (recommended)
 
 ```powershell
-irm https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/main/uninstall.ps1 | iex
+irm https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/uninstall.ps1 | iex
 ```
 
 ### Manual Uninstall
