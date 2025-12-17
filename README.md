@@ -21,8 +21,6 @@ These scripts may override other hotkeys, so pick the one that works best for yo
 - **CapsLock** - Great option if you rarely use Caps Lock functionality.
 - **F1** - Good choice if you don't rely on F1 for Help menus in applications.
 
-**Note:** Languages switch in order of their internal ID, which may differ from the order shown in Windows settings.
-
 ## Benefits
 
 1. ✅ **Reliable, instant language switching** - Never miss a hotkey press again
