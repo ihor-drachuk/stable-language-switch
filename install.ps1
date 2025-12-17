@@ -53,12 +53,41 @@ if (-not (Test-Administrator)) {
 Write-Host "[✓] Running with administrator privileges" -ForegroundColor Green
 
 # ==============================================================================
+# 1.5. Determine Logged-In User's Registry Path
+# ==============================================================================
+# When running as admin, HKCU may point to a different user's registry.
+# We need to find the actual logged-in user and access their registry directly.
+
+$loggedInUser = $null
+$userSID = $null
+
+try {
+    # Get the currently logged-in user (the one with the active desktop session)
+    $loggedInUser = (Get-WmiObject -Class Win32_ComputerSystem).UserName
+
+    if ($loggedInUser) {
+        # Convert username to SID
+        $userSID = (New-Object System.Security.Principal.NTAccount($loggedInUser)).Translate(
+            [System.Security.Principal.SecurityIdentifier]
+        ).Value
+        Write-Host "[✓] Detected logged-in user: $loggedInUser" -ForegroundColor Green
+    }
+} catch {
+    Write-Host "[!] Could not detect logged-in user, using current context" -ForegroundColor Yellow
+}
+
+# Build registry path - use HKU with SID if available, otherwise fall back to HKCU
+if ($userSID) {
+    $registryPath = "Registry::HKEY_USERS\$userSID\Keyboard Layout\Toggle"
+} else {
+    $registryPath = "HKCU:\Keyboard Layout\Toggle"
+}
+
+# ==============================================================================
 # 2. Detect Current Windows Keyboard Layout Switching Hotkey
 # ==============================================================================
 
 Write-Host "`nDetecting your current Windows keyboard layout switching hotkey..." -ForegroundColor Gray
-
-$registryPath = "HKCU:\Keyboard Layout\Toggle"
 $currentHotkey = $null
 $hotkeyName = "Unknown"
 
@@ -142,18 +171,88 @@ switch ($choice) {
 Write-Host "[✓] Selected: $scriptName" -ForegroundColor Green
 
 # ==============================================================================
+# 3.5. Stop and Remove Previous Installation
+# ==============================================================================
+
+$installDir = "$env:LOCALAPPDATA\StableLanguageSwitch"
+
+# Stop any running scripts from previous installation
+$stoppedCount = 0
+$allProcesses = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path }
+
+foreach ($process in $allProcesses) {
+    try {
+        if ($process.Path -like "$installDir\*") {
+            Stop-Process -Id $process.Id -Force -ErrorAction Stop
+            $stoppedCount++
+        }
+    } catch {
+        # Process might have already exited
+    }
+}
+
+# Also try known names
+$knownNames = @("Ctrl+Shift", "Alt+Shift")
+foreach ($name in $knownNames) {
+    try {
+        $proc = Get-Process -Name $name -ErrorAction SilentlyContinue
+        if ($proc) {
+            Stop-Process -Name $name -Force -ErrorAction SilentlyContinue
+            $stoppedCount++
+        }
+    } catch { }
+}
+
+if ($stoppedCount -gt 0) {
+    Start-Sleep -Milliseconds 500
+    Write-Host "[i] Stopped $stoppedCount previous script(s)" -ForegroundColor Gray
+}
+
+# Remove old executables
+if (Test-Path $installDir) {
+    $oldFiles = Get-ChildItem -Path $installDir -Filter "*.exe" -ErrorAction SilentlyContinue
+    foreach ($file in $oldFiles) {
+        try {
+            Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue
+        } catch { }
+    }
+}
+
+# Remove old startup shortcuts
+$startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+$oldShortcuts = @("Ctrl+Shift.lnk", "Alt+Shift.lnk", "F1.lnk", "CapsLock.lnk")
+foreach ($shortcut in $oldShortcuts) {
+    $shortcutPath = Join-Path $startupPath $shortcut
+    if (Test-Path $shortcutPath) {
+        Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# ==============================================================================
 # 4. Download Chosen Executable from GitHub
 # ==============================================================================
 
 Write-Host "`nDownloading $fileName..." -ForegroundColor Gray
-
-$installDir = "$env:LOCALAPPDATA\StableLanguageSwitch"
 $installPath = Join-Path $installDir $fileName
 $downloadUrl = "https://raw.githubusercontent.com/$GitHubUsername/$RepoName/master/bin/$fileName"
 
 # Create installation directory
 if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+}
+
+# Save original hotkey for later restoration during uninstall
+# Don't overwrite if file already exists (reinstall scenario)
+$originalHotkeyFile = Join-Path $installDir "original_hotkey.txt"
+if (-not (Test-Path $originalHotkeyFile)) {
+    if ($currentHotkey -and $currentHotkey -ne "3") {
+        # Only save if we detected a valid hotkey (not disabled)
+        try {
+            $currentHotkey | Out-File -FilePath $originalHotkeyFile -Encoding UTF8 -NoNewline
+        } catch {
+            Write-Host "[!] Warning: Could not save original hotkey setting" -ForegroundColor Yellow
+        }
+    }
 }
 
 # Download file
@@ -180,7 +279,16 @@ Write-Host "`nDisabling Windows keyboard layout switching hotkey..." -Foreground
 try {
     # Ensure registry path exists
     if (-not (Test-Path $registryPath)) {
-        New-Item -Path $registryPath -Force | Out-Null
+        # For Registry:: paths, we need to create parent path first
+        if ($userSID) {
+            $parentPath = "Registry::HKEY_USERS\$userSID\Keyboard Layout"
+            if (-not (Test-Path $parentPath)) {
+                New-Item -Path $parentPath -Force | Out-Null
+            }
+            New-Item -Path $registryPath -Force | Out-Null
+        } else {
+            New-Item -Path $registryPath -Force | Out-Null
+        }
     }
 
     # Set hotkey to 3 (disabled)
@@ -196,61 +304,6 @@ try {
     Write-Host "  → Input language hot keys → Change Key Sequence → Not Assigned" -ForegroundColor Gray
 }
 
-# ==============================================================================
-# 6. Apply Registry Changes Without Reboot
-# ==============================================================================
-
-Write-Host "`nApplying changes..." -ForegroundColor Gray
-
-# METHOD 1 (ACTIVE): Restart ctfmon.exe (Text Services Framework)
-try {
-    $ctfmonProcess = Get-Process -Name "ctfmon" -ErrorAction SilentlyContinue
-    if ($ctfmonProcess) {
-        Stop-Process -Name "ctfmon" -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Milliseconds 500
-    }
-    Start-Process "ctfmon.exe"
-    Write-Host "[✓] Changes applied (restarted Text Services Framework)" -ForegroundColor Green
-} catch {
-    Write-Host "[!] Warning: Could not restart ctfmon.exe" -ForegroundColor Yellow
-    Write-Host "    Changes will take effect after you log off and log back in." -ForegroundColor Gray
-}
-
-# METHOD 2 (COMMENTED OUT): Broadcast WM_SETTINGCHANGE message
-<#
-try {
-    Add-Type -TypeDefinition @"
-    using System;
-    using System.Runtime.InteropServices;
-    public class Win32 {
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        public static extern IntPtr SendMessageTimeout(
-            IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam,
-            uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
-    }
-"@
-    $HWND_BROADCAST = [IntPtr]0xffff
-    $WM_SETTINGCHANGE = 0x1a
-    $result = [UIntPtr]::Zero
-    [Win32]::SendMessageTimeout($HWND_BROADCAST, $WM_SETTINGCHANGE, [UIntPtr]::Zero, "Environment", 2, 5000, [ref]$result)
-    Write-Host "[✓] Broadcast WM_SETTINGCHANGE message" -ForegroundColor Green
-} catch {
-    Write-Host "[!] Warning: Could not broadcast settings change" -ForegroundColor Yellow
-}
-#>
-
-# METHOD 3 (COMMENTED OUT): Inform user about logoff/reboot
-<#
-Write-Host "`nNote: Changes will take effect after you:" -ForegroundColor Yellow
-Write-Host "  - Log off and log back in, or" -ForegroundColor Gray
-Write-Host "  - Restart Windows" -ForegroundColor Gray
-$logoffNow = Read-Host "`nWould you like to log off now? (y/N)"
-if ($logoffNow -eq 'y' -or $logoffNow -eq 'Y') {
-    Write-Host "Logging off in 5 seconds..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 5
-    logoff
-}
-#>
 
 # ==============================================================================
 # 7. Create Startup Shortcut
@@ -258,7 +311,6 @@ if ($logoffNow -eq 'y' -or $logoffNow -eq 'Y') {
 
 Write-Host "`nAdding to Windows startup..." -ForegroundColor Gray
 
-$startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
 $shortcutPath = Join-Path $startupPath "$scriptName.lnk"
 
 try {

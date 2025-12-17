@@ -33,40 +33,101 @@ function Test-Administrator {
 }
 
 if (-not (Test-Administrator)) {
-    Write-Host "WARNING: Running without administrator privileges." -ForegroundColor Yellow
-    Write-Host "Registry changes require administrator rights. Files will still be removed.`n" -ForegroundColor Gray
+    Write-Host "ERROR: This script requires administrator privileges to modify registry settings." -ForegroundColor Red
+    Write-Host "Please run PowerShell as Administrator and try again.`n" -ForegroundColor Yellow
+
+    $elevated = Read-Host "Would you like to restart this script as Administrator? (Y/n)"
+    if ($elevated -ne 'n' -and $elevated -ne 'N') {
+        # Using -EncodedCommand to avoid escaping issues with quotes and special characters
+        $scriptUrl = "https://raw.githubusercontent.com/$GitHubUsername/$RepoName/master/uninstall.ps1"
+        $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; irm '$scriptUrl' | iex"
+        $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
+        $encodedCommand = [Convert]::ToBase64String($bytes)
+        Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -EncodedCommand $encodedCommand"
+    }
+    exit 1
+}
+
+Write-Host "[✓] Running with administrator privileges" -ForegroundColor Green
+
+# ==============================================================================
+# 1.5. Determine Logged-In User's Registry Path
+# ==============================================================================
+
+$loggedInUser = $null
+$userSID = $null
+
+try {
+    $loggedInUser = (Get-WmiObject -Class Win32_ComputerSystem).UserName
+
+    if ($loggedInUser) {
+        $userSID = (New-Object System.Security.Principal.NTAccount($loggedInUser)).Translate(
+            [System.Security.Principal.SecurityIdentifier]
+        ).Value
+        Write-Host "[✓] Detected logged-in user: $loggedInUser" -ForegroundColor Green
+    }
+} catch {
+    Write-Host "[!] Could not detect logged-in user, using current context" -ForegroundColor Yellow
+}
+
+# Build registry path
+if ($userSID) {
+    $registryPath = "Registry::HKEY_USERS\$userSID\Keyboard Layout\Toggle"
+} else {
+    $registryPath = "HKCU:\Keyboard Layout\Toggle"
 }
 
 # ==============================================================================
 # 2. Stop Running Scripts
 # ==============================================================================
 
-Write-Host "Stopping any running language switch scripts..." -ForegroundColor Gray
+Write-Host "`nStopping any running language switch scripts..." -ForegroundColor Gray
 
 $stoppedCount = 0
+$installDir = "$env:LOCALAPPDATA\StableLanguageSwitch"
 
-# Look for AutoHotkey processes running our scripts
-$ahkProcesses = Get-Process -Name "AutoHotkey*", "Ctrl+Shift", "Alt+Shift", "F1", "CapsLock" -ErrorAction SilentlyContinue
-
-foreach ($process in $ahkProcesses) {
+# Read original hotkey file BEFORE deleting files
+$savedOriginalHotkey = $null
+$originalHotkeyFile = Join-Path $installDir "original_hotkey.txt"
+if (Test-Path $originalHotkeyFile) {
     try {
-        # Check if it's our script by looking at the command line or window title
-        $processPath = $process.Path
-        if ($processPath -like "*StableLanguageSwitch*" -or
-            $processPath -like "*Ctrl+Shift.exe*" -or
-            $processPath -like "*Alt+Shift.exe*" -or
-            $processPath -like "*F1.exe*" -or
-            $processPath -like "*CapsLock.exe*") {
+        $savedOriginalHotkey = (Get-Content -Path $originalHotkeyFile -Raw).Trim()
+    } catch { }
+}
 
-            Stop-Process -Id $process.Id -Force
+# Get all processes and check if they're running from our install directory
+$allProcesses = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path }
+
+foreach ($process in $allProcesses) {
+    try {
+        if ($process.Path -like "$installDir\*") {
+            Stop-Process -Id $process.Id -Force -ErrorAction Stop
             $stoppedCount++
+            Write-Host "    Stopped: $($process.Name)" -ForegroundColor Gray
         }
     } catch {
-        # Process might have already exited
+        # Process might have already exited or access denied
     }
 }
 
+# Also try to stop by known executable names (in case path detection fails)
+$knownNames = @("Ctrl+Shift", "Alt+Shift", "CapsLock", "F1")
+foreach ($name in $knownNames) {
+    try {
+        $proc = Get-Process -Name $name -ErrorAction SilentlyContinue
+        if ($proc) {
+            Stop-Process -Name $name -Force -ErrorAction SilentlyContinue
+            $stoppedCount++
+            Write-Host "    Stopped: $name" -ForegroundColor Gray
+        }
+    } catch {
+        # Ignore
+    }
+}
+
+# Give Windows time to release file handles
 if ($stoppedCount -gt 0) {
+    Start-Sleep -Milliseconds 500
     Write-Host "[✓] Stopped $stoppedCount running script(s)" -ForegroundColor Green
 } else {
     Write-Host "[i] No running scripts found" -ForegroundColor Gray
@@ -78,7 +139,6 @@ if ($stoppedCount -gt 0) {
 
 Write-Host "`nRemoving installed files..." -ForegroundColor Gray
 
-$installDir = "$env:LOCALAPPDATA\StableLanguageSwitch"
 $removedFiles = 0
 
 if (Test-Path $installDir) {
@@ -132,117 +192,103 @@ if ($removedShortcuts -gt 0) {
 }
 
 # ==============================================================================
-# 5. Ask User About Restoring Windows Hotkey
+# 5. Restore Windows Hotkey
 # ==============================================================================
 
-Write-Host "`nDo you want to restore the Windows keyboard layout switching hotkey?" -ForegroundColor Cyan
-$restore = Read-Host "Restore Windows hotkey? (Y/n)"
+Write-Host "`nRestoring Windows keyboard layout switching hotkey..." -ForegroundColor Gray
 
-if ($restore -ne 'n' -and $restore -ne 'N') {
-    if (-not (Test-Administrator)) {
-        Write-Host "[✗] ERROR: Administrator privileges required to modify registry" -ForegroundColor Red
-        Write-Host "Please run this uninstaller as Administrator to restore the Windows hotkey.`n" -ForegroundColor Yellow
-        Write-Host "Alternatively, you can restore it manually:" -ForegroundColor Gray
-        Write-Host "  Settings → Time & Language → Typing → Advanced keyboard settings" -ForegroundColor Gray
-        Write-Host "  → Input language hot keys → Change Key Sequence" -ForegroundColor Gray
-    } else {
-        Write-Host "`nWhich hotkey would you like to restore?" -ForegroundColor Cyan
-        Write-Host "  [1] Ctrl+Shift" -ForegroundColor White
-        Write-Host "  [2] Alt+Shift" -ForegroundColor White
-        Write-Host "  [3] Keep disabled" -ForegroundColor White
-        Write-Host ""
+$hotkeyValue = $null
+$hotkeyName = $null
 
+# Use previously read original hotkey value
+if ($savedOriginalHotkey -eq "1" -or $savedOriginalHotkey -eq "2") {
+    $hotkeyValue = $savedOriginalHotkey
+    switch ($savedOriginalHotkey) {
+        "1" { $hotkeyName = "Alt+Shift" }
+        "2" { $hotkeyName = "Ctrl+Shift" }
+    }
+    Write-Host "[i] Found saved original hotkey: $hotkeyName" -ForegroundColor Gray
+}
+
+# If we couldn't determine the original hotkey, ask the user
+if (-not $hotkeyValue) {
+    Write-Host "[!] Could not determine your original hotkey setting." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Which hotkey would you like to restore?" -ForegroundColor Cyan
+    Write-Host "  [1] Alt+Shift (most common)" -ForegroundColor White
+    Write-Host "  [2] Ctrl+Shift" -ForegroundColor White
+    Write-Host "  [3] Keep disabled (not recommended)" -ForegroundColor DarkGray
+    Write-Host ""
+
+    do {
         $choice = Read-Host "Enter your choice (1, 2, or 3)"
-
-        $hotkeyValue = "3" # Default: disabled
-        $hotkeyName = "None"
 
         switch ($choice) {
             "1" {
-                $hotkeyValue = "2"
-                $hotkeyName = "Ctrl+Shift"
-            }
-            "2" {
                 $hotkeyValue = "1"
                 $hotkeyName = "Alt+Shift"
+            }
+            "2" {
+                $hotkeyValue = "2"
+                $hotkeyName = "Ctrl+Shift"
             }
             "3" {
                 $hotkeyValue = "3"
                 $hotkeyName = "None (disabled)"
             }
             default {
-                Write-Host "Invalid choice. Keeping disabled." -ForegroundColor Yellow
+                Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Yellow
+            }
+        }
+    } while (-not $hotkeyValue)
+}
+
+# ==============================================================================
+# 6. Update Registry
+# ==============================================================================
+
+if ($hotkeyName -ne "None (disabled)") {
+    Write-Host "Restoring Windows hotkey to: $hotkeyName..." -ForegroundColor Gray
+
+    try {
+        # Ensure registry path exists
+        if (-not (Test-Path $registryPath)) {
+            if ($userSID) {
+                $parentPath = "Registry::HKEY_USERS\$userSID\Keyboard Layout"
+                if (-not (Test-Path $parentPath)) {
+                    New-Item -Path $parentPath -Force | Out-Null
+                }
+                New-Item -Path $registryPath -Force | Out-Null
+            } else {
+                New-Item -Path $registryPath -Force | Out-Null
             }
         }
 
-        # ==============================================================================
-        # 6. Update Registry
-        # ==============================================================================
+        # Set hotkey value
+        Set-ItemProperty -Path $registryPath -Name "Hotkey" -Value $hotkeyValue -Type String
+        Set-ItemProperty -Path $registryPath -Name "Language Hotkey" -Value $hotkeyValue -Type String
 
-        if ($hotkeyName -ne "None (disabled)") {
-            Write-Host "`nRestoring Windows hotkey to: $hotkeyName..." -ForegroundColor Gray
-
-            $registryPath = "HKCU:\Keyboard Layout\Toggle"
-
-            try {
-                # Ensure registry path exists
-                if (-not (Test-Path $registryPath)) {
-                    New-Item -Path $registryPath -Force | Out-Null
-                }
-
-                # Set hotkey value
-                Set-ItemProperty -Path $registryPath -Name "Hotkey" -Value $hotkeyValue -Type String
-                Set-ItemProperty -Path $registryPath -Name "Language Hotkey" -Value $hotkeyValue -Type String
-
-                Write-Host "[✓] Windows hotkey restored to: $hotkeyName" -ForegroundColor Green
-
-                # ==============================================================================
-                # 7. Apply Registry Changes
-                # ==============================================================================
-
-                Write-Host "`nApplying changes..." -ForegroundColor Gray
-
-                # METHOD 1 (ACTIVE): Restart ctfmon.exe
-                try {
-                    $ctfmonProcess = Get-Process -Name "ctfmon" -ErrorAction SilentlyContinue
-                    if ($ctfmonProcess) {
-                        Stop-Process -Name "ctfmon" -Force -ErrorAction SilentlyContinue
-                        Start-Sleep -Milliseconds 500
-                    }
-                    Start-Process "ctfmon.exe"
-                    Write-Host "[✓] Changes applied (restarted Text Services Framework)" -ForegroundColor Green
-                } catch {
-                    Write-Host "[!] Warning: Could not restart ctfmon.exe" -ForegroundColor Yellow
-                    Write-Host "    Changes will take effect after you log off and log back in." -ForegroundColor Gray
-                }
-            } catch {
-                Write-Host "[✗] ERROR: Failed to modify registry" -ForegroundColor Red
-                Write-Host "Error: $_" -ForegroundColor Red
-                Write-Host "`nYou can restore the hotkey manually:" -ForegroundColor Yellow
-                Write-Host "  Settings → Time & Language → Typing → Advanced keyboard settings" -ForegroundColor Gray
-                Write-Host "  → Input language hot keys → Change Key Sequence" -ForegroundColor Gray
-            }
-        } else {
-            Write-Host "[i] Windows hotkey left disabled" -ForegroundColor Gray
-        }
+        Write-Host "[✓] Windows hotkey restored to: $hotkeyName" -ForegroundColor Green
+    } catch {
+        Write-Host "[✗] ERROR: Failed to modify registry" -ForegroundColor Red
+        Write-Host "Error: $_" -ForegroundColor Red
+        Write-Host "`nYou can restore the hotkey manually:" -ForegroundColor Yellow
+        Write-Host "  Settings → Time & Language → Typing → Advanced keyboard settings" -ForegroundColor Gray
+        Write-Host "  → Input language hot keys → Change Key Sequence" -ForegroundColor Gray
     }
 } else {
     Write-Host "[i] Windows hotkey left disabled" -ForegroundColor Gray
 }
 
 # ==============================================================================
-# 8. Success Message
+# 7. Success Message
 # ==============================================================================
 
 Write-Host "`n=== Uninstallation Complete! ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "✓ Scripts stopped and removed" -ForegroundColor White
 Write-Host "✓ Startup shortcuts removed" -ForegroundColor White
-
-if ($restore -ne 'n' -and $restore -ne 'N' -and (Test-Administrator)) {
-    Write-Host "✓ Windows hotkey settings updated" -ForegroundColor White
-}
-
+Write-Host "✓ Windows hotkey restored to: $hotkeyName" -ForegroundColor White
 Write-Host ""
 Write-Host "Thank you for trying Stable Language Switch!" -ForegroundColor Cyan
 Write-Host ""
