@@ -1,14 +1,9 @@
 #Requires AutoHotkey v2.0
-#Include LanguageSwitcher.ahk
 
 ; ==============================================================================
 ; Stable Language Switch - Ctrl+Shift
 ; ==============================================================================
 ; Purpose: Reliable keyboard language switching using Ctrl+Shift
-;
-; Features:
-;   - Handles all 8 possible key combinations
-;   - Respects the language order from Windows settings
 ;
 ; IMPORTANT LIMITATION:
 ;   - This script blocks Ctrl+Shift+[key] combinations (e.g., Ctrl+Shift+T)
@@ -20,34 +15,34 @@
 
 ; Ctrl pressed first, then Shift
 LControl & LShift:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 LControl & RShift:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 RControl & LShift:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 RControl & RShift:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 ; Shift pressed first, then Ctrl
 LShift & LControl:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 LShift & RControl:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 RShift & LControl:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 RShift & RControl:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }

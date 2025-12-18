@@ -1,14 +1,9 @@
 #Requires AutoHotkey v2.0
-#Include LanguageSwitcher.ahk
 
 ; ==============================================================================
 ; Stable Language Switch - Alt+Shift
 ; ==============================================================================
 ; Purpose: Reliable keyboard language switching using Alt+Shift
-;
-; Features:
-;   - Handles all 8 possible key combinations
-;   - Respects the language order from Windows settings
 ;
 ; License: MIT
 ; Repository: https://github.com/ihor-drachuk/stable-language-switch
@@ -16,34 +11,34 @@
 
 ; Alt pressed first, then Shift
 LAlt & LShift:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 LAlt & RShift:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 RAlt & LShift:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 RAlt & RShift:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 ; Shift pressed first, then Alt
 LShift & LAlt:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 LShift & RAlt:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 RShift & LAlt:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
 
 RShift & RAlt:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }

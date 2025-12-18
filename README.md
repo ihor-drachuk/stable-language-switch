@@ -10,7 +10,7 @@ Windows built-in keyboard layout switching hotkeys (Ctrl+Shift, Alt+Shift) have 
 
 ## The Solution
 
-Replace Windows system hotkeys with AutoHotkey scripts that use direct `PostMessage` calls. These scripts intercept the key combinations and switch languages immediately, without Windows' unreliable handling.
+Replace Windows system hotkeys with AutoHotkey scripts that remap your preferred hotkey to `Win+Space`, Windows' built-in language switching shortcut which works more stable in combination with this solution.
 
 ## Choosing Your Hotkey
 
@@ -92,34 +92,25 @@ Uninstall manually by reversing the installation steps:
 
 ## How It Works
 
-The scripts use AutoHotkey to capture key presses and send direct language switching commands.
+The scripts use AutoHotkey to remap your preferred hotkey to `Win+Space`, which is Windows' built-in language switching shortcut. This approach works reliably in all applications, including those running with administrator privileges.
 
 **For key combinations** (Ctrl+Shift or Alt+Shift), the `&` operator captures all possible variants:
 
 ```autohotkey
 LControl & LShift:: {
-    PostMessage(0x50, 0x02, 0, , "A")  ; WM_INPUTLANGCHANGEREQUEST
+    Send "#{Space}"  ; Sends Win+Space
 }
 ```
 
 **For single keys** (F1 or CapsLock), a simple hotkey definition:
 
 ```autohotkey
-F1:: {
-    PostMessage(0x50, 0x02, 0, , "A")  ; WM_INPUTLANGCHANGEREQUEST
-}
-
 CapsLock:: {
-    PostMessage(0x50, 0x02, 0, , "A")  ; WM_INPUTLANGCHANGEREQUEST
+    Send "#{Space}"  ; Sends Win+Space
 }
 ```
 
-Parameters:
-- `0x50` = WM_INPUTLANGCHANGEREQUEST message
-- `0x02` = INPUTLANGCHANGE_FORWARD (switch to next language)
-- `"A"` = Send to active window
-
-This bypasses Windows' language switching system entirely, eliminating both the unreliability and the input lag.
+The `#` symbol in AutoHotkey represents the Windows key, so `#{Space}` sends the Win+Space keystroke that triggers Windows' native language switcher.
 
 ## License
 

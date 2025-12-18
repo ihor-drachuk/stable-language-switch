@@ -1,11 +1,9 @@
 #Requires AutoHotkey v2.0
-#Include LanguageSwitcher.ahk
 
 ; ==============================================================================
-; Stable Language Switch - CapsLock (Modified)
+; Stable Language Switch - CapsLock
 ; ==============================================================================
 ; Purpose: Reliable keyboard language switching using CapsLock key
-;          This version respects the language order from Windows settings
 ;
 ; Note: This will override CapsLock's default function (toggle caps).
 ;
@@ -14,5 +12,5 @@
 ; ==============================================================================
 
 CapsLock:: {
-    SwitchToNextLayout()
+    Send "#{Space}"
 }
