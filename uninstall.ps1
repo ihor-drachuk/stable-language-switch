@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # Stable Language Switch - Uninstaller
 # ==============================================================================
 # This script removes the stable language switching solution
@@ -38,14 +38,23 @@ if (-not (Test-Administrator)) {
 
     $elevated = Read-Host "Would you like to restart this script as Administrator? (Y/n)"
     if ($elevated -ne 'n' -and $elevated -ne 'N') {
-        # Using -EncodedCommand to avoid escaping issues with quotes and special characters
-        $scriptUrl = "https://raw.githubusercontent.com/$GitHubUsername/$RepoName/master/uninstall.ps1"
-        $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; irm '$scriptUrl' | iex"
-        $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
-        $encodedCommand = [Convert]::ToBase64String($bytes)
-        Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -EncodedCommand $encodedCommand"
+        # Relaunch the CURRENT script file as Administrator
+        $currentScriptPath = $MyInvocation.MyCommand.Path
+
+        # If running from a file (not via iex)
+        if ($currentScriptPath) {
+            Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$currentScriptPath`""
+        } else {
+            # Fallback for irm|iex execution: download and run again
+            $scriptUrl = "https://raw.githubusercontent.com/$GitHubUsername/$RepoName/master/uninstall.ps1"
+            $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; irm '$scriptUrl' | iex"
+            $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
+            $encodedCommand = [Convert]::ToBase64String($bytes)
+            Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -EncodedCommand $encodedCommand"
+        }
     }
-    exit 1
+    # Close the current non-elevated window immediately
+    Stop-Process -Id $PID
 }
 
 Write-Host "[✓] Running with administrator privileges" -ForegroundColor Green
@@ -192,7 +201,26 @@ if ($removedShortcuts -gt 0) {
 }
 
 # ==============================================================================
-# 5. Restore Windows Hotkey
+# 5. Remove from Add/Remove Programs
+# ==============================================================================
+
+Write-Host "`nRemoving from Add/Remove Programs..." -ForegroundColor Gray
+
+$uninstallRegPath = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\StableLanguageSwitch"
+
+if (Test-Path $uninstallRegPath) {
+    try {
+        Remove-Item -Path $uninstallRegPath -Recurse -Force
+        Write-Host "[✓] Removed from Add/Remove Programs" -ForegroundColor Green
+    } catch {
+        Write-Host "[!] Warning: Could not remove registry entry" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "[i] Not found in Add/Remove Programs" -ForegroundColor Gray
+}
+
+# ==============================================================================
+# 6. Restore Windows Hotkey
 # ==============================================================================
 
 Write-Host "`nRestoring Windows keyboard layout switching hotkey..." -ForegroundColor Gray
@@ -244,7 +272,7 @@ if (-not $hotkeyValue) {
 }
 
 # ==============================================================================
-# 6. Update Registry
+# 7. Update Registry
 # ==============================================================================
 
 if ($hotkeyName -ne "None (disabled)") {
@@ -281,17 +309,20 @@ if ($hotkeyName -ne "None (disabled)") {
 }
 
 # ==============================================================================
-# 7. Success Message
+# 8. Success Message
 # ==============================================================================
 
 Write-Host "`n=== Uninstallation Complete! ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "✓ Scripts stopped and removed" -ForegroundColor White
 Write-Host "✓ Startup shortcuts removed" -ForegroundColor White
+Write-Host "✓ Removed from Add/Remove Programs" -ForegroundColor White
 Write-Host "✓ Windows hotkey restored to: $hotkeyName" -ForegroundColor White
 Write-Host ""
 Write-Host "Thank you for trying Stable Language Switch!" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "If you experienced any issues or have feedback, please let us know:" -ForegroundColor Gray
+Write-Host "If you experienced any issues or have feedback, please let me know:" -ForegroundColor Gray
 Write-Host "  https://github.com/$GitHubUsername/$RepoName/issues" -ForegroundColor White
 Write-Host ""
+Write-Host "Press Enter to close this window..." -ForegroundColor DarkGray
+Read-Host | Out-Null

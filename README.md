@@ -68,18 +68,27 @@ irm https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master
 
 ## Uninstall
 
-### Automatic Uninstall (recommended)
+### If Installed via Automatic Script
 
-```powershell
-irm https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/uninstall.ps1 | iex
-```
+Go to **Settings** → **Apps** → **Installed apps** and search for **"Stable Language Switch"**.
 
-### Manual Uninstall
+### If Installed Manually
 
-1. Press **Win+R**, type `shell:startup`, press **Enter**
-2. Remove downloaded `.exe` file from your Startup folder
-3. Stop the running script (right-click green tray icon → Exit)
-4. Re-enable Windows keyboard layout switching hotkey in Settings (reverse the steps from installation)
+Uninstall manually by reversing the installation steps:
+
+1. **Stop the running script:**
+   - Right-click the AutoHotkey icon in the system tray and select **Exit**
+
+2. **Remove from startup:**
+   - Press **Win+R**, type `shell:startup`, press **Enter**
+   - Delete the `.exe` file from the **Startup** folder
+
+3. **Re-enable Windows hotkey** (optional):
+   - Open **Settings** → **Time & Language** → **Typing** → **Advanced keyboard settings**
+   - Click **"Input language hot keys"**
+   - Select **"Between input languages"** and click **"Change Key Sequence..."**
+   - Select your preferred hotkey (Alt+Shift or Ctrl+Shift)
+   - Click **OK**
 
 ## How It Works
 

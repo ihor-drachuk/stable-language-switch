@@ -129,7 +129,7 @@ try {
 Write-Host "`nWhich hotkey combination would you like to use?" -ForegroundColor Cyan
 
 if ($hotkeyName -eq "Ctrl+Shift" -or $hotkeyName -eq "Alt+Shift") {
-    Write-Host "We detected you're currently using: $hotkeyName" -ForegroundColor Gray
+    Write-Host "Detected current hotkey: $hotkeyName" -ForegroundColor Gray
     Write-Host ""
 }
 
@@ -255,10 +255,10 @@ if (-not (Test-Path $originalHotkeyFile)) {
     }
 }
 
-# Download file
+# Download executable
 try {
     Invoke-WebRequest -Uri $downloadUrl -OutFile $installPath -UseBasicParsing
-    Write-Host "[✓] Downloaded to: $installPath" -ForegroundColor Green
+    Write-Host "[✓] Downloaded: $fileName" -ForegroundColor Green
 } catch {
     Write-Host "[✗] ERROR: Failed to download file" -ForegroundColor Red
     Write-Host "URL: $downloadUrl" -ForegroundColor Gray
@@ -268,6 +268,17 @@ try {
     Write-Host "  2. The file exists in the repository" -ForegroundColor Gray
     Write-Host "  3. Your internet connection is working" -ForegroundColor Gray
     exit 1
+}
+
+# Download uninstall script (for Add/Remove Programs)
+# Use DownloadFile to preserve exact bytes (assuming file has BOM)
+$uninstallScriptPath = Join-Path $installDir "uninstall.ps1"
+$uninstallScriptUrl = "https://raw.githubusercontent.com/$GitHubUsername/$RepoName/master/uninstall.ps1"
+try {
+    (New-Object System.Net.WebClient).DownloadFile($uninstallScriptUrl, $uninstallScriptPath)
+    Write-Host "[✓] Downloaded: uninstall.ps1" -ForegroundColor Green
+} catch {
+    Write-Host "[!] Warning: Could not download uninstall script" -ForegroundColor Yellow
 }
 
 # ==============================================================================
@@ -329,7 +340,43 @@ try {
 }
 
 # ==============================================================================
-# 8. Launch the Script
+# 8. Register in Add/Remove Programs
+# ==============================================================================
+
+Write-Host "`nRegistering in Add/Remove Programs..." -ForegroundColor Gray
+
+$uninstallRegPath = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\StableLanguageSwitch"
+$uninstallScriptPath = Join-Path $installDir "uninstall.ps1"
+
+# Simple approach: run PowerShell
+# The script will handle its own elevation via the built-in elevation prompt
+$uninstallCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$uninstallScriptPath`""
+
+try {
+    # Create registry key
+    if (-not (Test-Path $uninstallRegPath)) {
+        New-Item -Path $uninstallRegPath -Force | Out-Null
+    }
+
+    # Set values
+    Set-ItemProperty -Path $uninstallRegPath -Name "DisplayName" -Value "Stable Language Switch" -Type String
+    Set-ItemProperty -Path $uninstallRegPath -Name "UninstallString" -Value $uninstallCommand -Type String
+    Set-ItemProperty -Path $uninstallRegPath -Name "DisplayIcon" -Value $installPath -Type String
+    Set-ItemProperty -Path $uninstallRegPath -Name "Publisher" -Value "Ihor Drachuk" -Type String
+    Set-ItemProperty -Path $uninstallRegPath -Name "DisplayVersion" -Value "1.1" -Type String
+    Set-ItemProperty -Path $uninstallRegPath -Name "InstallLocation" -Value $installDir -Type String
+    Set-ItemProperty -Path $uninstallRegPath -Name "URLInfoAbout" -Value "https://github.com/$GitHubUsername/$RepoName" -Type String
+    Set-ItemProperty -Path $uninstallRegPath -Name "HelpLink" -Value "https://github.com/$GitHubUsername/$RepoName" -Type String
+    Set-ItemProperty -Path $uninstallRegPath -Name "NoModify" -Value 1 -Type DWord
+    Set-ItemProperty -Path $uninstallRegPath -Name "NoRepair" -Value 1 -Type DWord
+
+    Write-Host "[✓] Registered in Add/Remove Programs" -ForegroundColor Green
+} catch {
+    Write-Host "[!] Warning: Could not register in Add/Remove Programs" -ForegroundColor Yellow
+}
+
+# ==============================================================================
+# 9. Launch the Script
 # ==============================================================================
 
 Write-Host "`nLaunching $scriptName script..." -ForegroundColor Gray
@@ -344,7 +391,7 @@ try {
 }
 
 # ==============================================================================
-# 9. Success Message
+# 10. Success Message
 # ==============================================================================
 
 Write-Host "`n=== Installation Complete! ===" -ForegroundColor Green
@@ -352,12 +399,15 @@ Write-Host ""
 Write-Host "✓ $scriptName hotkey is now active" -ForegroundColor White
 Write-Host "✓ Windows system hotkey disabled" -ForegroundColor White
 Write-Host "✓ Added to startup (will run automatically on boot)" -ForegroundColor White
+Write-Host "✓ Can be uninstalled via Settings → Apps" -ForegroundColor White
 Write-Host ""
 Write-Host "Try pressing $scriptName now - language switching should be instant and reliable!" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "The script is running in the background. Look for the AutoHotkey icon" -ForegroundColor Gray
 Write-Host "in your system tray (bottom-right corner)." -ForegroundColor Gray
 Write-Host ""
-Write-Host "To uninstall, run:" -ForegroundColor Gray
-Write-Host "  irm https://raw.githubusercontent.com/$GitHubUsername/$RepoName/master/uninstall.ps1 | iex" -ForegroundColor White
+Write-Host "To uninstall, go to Settings → Apps → Installed apps" -ForegroundColor Gray
+Write-Host "and search for 'Stable Language Switch'." -ForegroundColor White
 Write-Host ""
+Write-Host "Press Enter to close this window..." -ForegroundColor DarkGray
+Read-Host | Out-Null
