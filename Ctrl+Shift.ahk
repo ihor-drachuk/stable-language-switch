@@ -6,7 +6,8 @@
 ; Purpose: Reliable keyboard language switching using Ctrl+Shift
 ;
 ; IMPORTANT LIMITATION:
-;   - This script blocks Ctrl+Shift+[key] combinations (e.g., Ctrl+Shift+T)
+;   - This script blocks Ctrl+Shift+[key] combinations
+;   - This includes: Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+Shift+T, Ctrl+Shift+S, Ctrl+Shift+F, etc.
 ;   - If you need these shortcuts, use Alt+Shift script instead
 ;
 ; License: MIT

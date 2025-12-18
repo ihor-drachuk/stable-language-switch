@@ -17,15 +17,14 @@ Replace Windows system hotkeys with AutoHotkey scripts that remap your preferred
 These scripts may override other hotkeys, so pick the one that works best for you:
 
 - **Alt+Shift** (Recommended) - Popular choice with minimal conflicts. Works great for most users.
-- **Ctrl+Shift** - Not recommended. Will block common shortcuts like Ctrl+Shift+T, Ctrl+Shift+S, Ctrl+Shift+F.
+- **Ctrl+Shift** - Not recommended. Will block common shortcuts like Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+Shift+T, Ctrl+Shift+S, Ctrl+Shift+F.
 - **CapsLock** - Great option if you rarely use Caps Lock functionality.
 - **F1** - Good choice if you don't rely on F1 for Help menus in applications.
 
 ## Benefits
 
 1. ✅ **Reliable, instant language switching** - Never miss a hotkey press again
-2. ✅ **Eliminates input lag** - Natural, responsive typing experience without fear or hesitation
-3. ✅ **Multiple options** - Choose between Ctrl+Shift, Alt+Shift, F1, or CapsLock
+2. ✅ **Multiple options** - Choose between Ctrl+Shift, Alt+Shift, F1, or CapsLock
 
 ## Quick Start
 
@@ -51,7 +50,7 @@ irm https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master
 2. **Download your preferred hotkey script:**
 
    - **Recommended:** Download [`Alt+Shift.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/bin/Alt%2BShift.exe) (fewer conflicts with existing shortcuts)
-   - Alternative: Download [`Ctrl+Shift.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/bin/Ctrl%2BShift.exe) (blocks Ctrl+Shift+[key] combinations)
+   - Alternative: Download [`Ctrl+Shift.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/bin/Ctrl%2BShift.exe) (blocks Ctrl+Shift+[key] combinations like Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+Shift+T, etc.)
    - Alternative: Download [`F1.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/bin/F1.exe) (single key press, but overrides F1 Help function)
    - Alternative: Download [`CapsLock.exe`](https://raw.githubusercontent.com/ihor-drachuk/stable-language-switch/master/bin/CapsLock.exe) (single key press, but disables CapsLock functionality)
 
@@ -89,28 +88,6 @@ Uninstall manually by reversing the installation steps:
    - Select **"Between input languages"** and click **"Change Key Sequence..."**
    - Select your preferred hotkey (Alt+Shift or Ctrl+Shift)
    - Click **OK**
-
-## How It Works
-
-The scripts use AutoHotkey to remap your preferred hotkey to `Win+Space`, which is Windows' built-in language switching shortcut. This approach works reliably in all applications, including those running with administrator privileges.
-
-**For key combinations** (Ctrl+Shift or Alt+Shift), the `&` operator captures all possible variants:
-
-```autohotkey
-LControl & LShift:: {
-    Send "#{Space}"  ; Sends Win+Space
-}
-```
-
-**For single keys** (F1 or CapsLock), a simple hotkey definition:
-
-```autohotkey
-CapsLock:: {
-    Send "#{Space}"  ; Sends Win+Space
-}
-```
-
-The `#` symbol in AutoHotkey represents the Windows key, so `#{Space}` sends the Win+Space keystroke that triggers Windows' native language switcher.
 
 ## License
 

@@ -134,7 +134,7 @@ if ($hotkeyName -eq "Ctrl+Shift" -or $hotkeyName -eq "Alt+Shift") {
 }
 
 Write-Host "  [1] Ctrl+Shift" -ForegroundColor White
-Write-Host "      WARNING: Blocks Ctrl+Shift+T, Ctrl+Shift+N, etc." -ForegroundColor Yellow
+Write-Host "      WARNING: Blocks Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+Shift+T, Ctrl+Shift+N, etc." -ForegroundColor Yellow
 Write-Host "  [2] Alt+Shift (Recommended)" -ForegroundColor Green
 Write-Host "      Fewer conflicts with existing shortcuts" -ForegroundColor Gray
 Write-Host "  [3] F1" -ForegroundColor White
