@@ -9,7 +9,14 @@
 #   3. Removes startup shortcuts
 #   4. Optionally restores Windows system hotkey
 #
-# Usage: irm URL | iex
+# Invocation: registered in Add/Remove Programs by install.ps1, run as
+#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<path>\uninstall.ps1"
+# Reached via Settings -> Apps -> Installed apps.
+#
+# Encoding: UTF-8 WITH BOM — required by `powershell.exe -File` on
+# PowerShell 5.1, which otherwise decodes the file as ANSI and mangles
+# the non-ASCII characters used below (e.g. [✓], →).
+# install.ps1 is the opposite — see its header.
 # ==============================================================================
 
 param(
@@ -227,6 +234,8 @@ Write-Host "`nRestoring Windows keyboard layout switching hotkey..." -Foreground
 
 $hotkeyValue = $null
 $hotkeyName = $null
+# Sentinel <unset> from install: restore by deleting both values, not writing one.
+$restoreToUnset = $false
 
 # Use previously read original hotkey value
 if ($savedOriginalHotkey -eq "1" -or $savedOriginalHotkey -eq "2") {
@@ -236,10 +245,14 @@ if ($savedOriginalHotkey -eq "1" -or $savedOriginalHotkey -eq "2") {
         "2" { $hotkeyName = "Ctrl+Shift" }
     }
     Write-Host "[i] Found saved original hotkey: $hotkeyName" -ForegroundColor Gray
+} elseif ($savedOriginalHotkey -eq "<unset>") {
+    $restoreToUnset = $true
+    $hotkeyName = "Alt+Shift (Windows default)"
+    Write-Host "[i] Found saved original state: Windows default (Alt+Shift, no registry value)" -ForegroundColor Gray
 }
 
 # If we couldn't determine the original hotkey, ask the user
-if (-not $hotkeyValue) {
+if (-not $hotkeyValue -and -not $restoreToUnset) {
     Write-Host "[!] Could not determine your original hotkey setting." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Which hotkey would you like to restore?" -ForegroundColor Cyan
@@ -275,7 +288,23 @@ if (-not $hotkeyValue) {
 # 7. Update Registry
 # ==============================================================================
 
-if ($hotkeyName -ne "None (disabled)") {
+if ($restoreToUnset) {
+    # Tricky: an empty REG_SZ ("") is NOT the same as an absent value —
+    # Windows only falls back to Alt+Shift when the values are truly absent.
+    # Also leave the Toggle subkey itself alone; it may hold unrelated
+    # Windows-owned values such as "Layout Hotkey".
+    try {
+        Remove-ItemProperty -Path $registryPath -Name "Hotkey" -ErrorAction SilentlyContinue
+        Remove-ItemProperty -Path $registryPath -Name "Language Hotkey" -ErrorAction SilentlyContinue
+        Write-Host "[✓] Windows hotkey restored to default (Alt+Shift)" -ForegroundColor Green
+    } catch {
+        Write-Host "[✗] ERROR: Failed to modify registry" -ForegroundColor Red
+        Write-Host "Error: $_" -ForegroundColor Red
+        Write-Host "`nYou can restore the hotkey manually:" -ForegroundColor Yellow
+        Write-Host "  Settings → Time & Language → Typing → Advanced keyboard settings" -ForegroundColor Gray
+        Write-Host "  → Input language hot keys → Change Key Sequence" -ForegroundColor Gray
+    }
+} elseif ($hotkeyName -ne "None (disabled)") {
     Write-Host "Restoring Windows hotkey to: $hotkeyName..." -ForegroundColor Gray
 
     try {
@@ -317,7 +346,11 @@ Write-Host ""
 Write-Host "✓ Scripts stopped and removed" -ForegroundColor White
 Write-Host "✓ Startup shortcuts removed" -ForegroundColor White
 Write-Host "✓ Removed from Add/Remove Programs" -ForegroundColor White
-Write-Host "✓ Windows hotkey restored to: $hotkeyName" -ForegroundColor White
+if ($restoreToUnset) {
+    Write-Host "✓ Windows hotkey restored to default (Alt+Shift)" -ForegroundColor White
+} else {
+    Write-Host "✓ Windows hotkey restored to: $hotkeyName" -ForegroundColor White
+}
 Write-Host ""
 Write-Host "Thank you for trying Stable Language Switch!" -ForegroundColor Cyan
 Write-Host ""

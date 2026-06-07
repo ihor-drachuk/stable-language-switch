@@ -11,6 +11,10 @@
 #   5. Launches the script immediately
 #
 # Usage: irm URL | iex
+#
+# Encoding: UTF-8 WITHOUT BOM — required by `irm | iex` on PowerShell 5.1
+# (a leading U+FEFF in the IRM string output breaks `iex`).
+# uninstall.ps1 is the opposite — see its header.
 # ==============================================================================
 
 param(
@@ -90,6 +94,9 @@ if ($userSID) {
 Write-Host "`nDetecting your current Windows keyboard layout switching hotkey..." -ForegroundColor Gray
 $currentHotkey = $null
 $hotkeyName = "Unknown"
+# Distinguishes "both values absent" (Windows default) from explicit "1",
+# so uninstall can restore by deleting values, not by writing "1" back.
+$isWindowsDefault = $false
 
 try {
     if (Test-Path $registryPath) {
@@ -105,12 +112,17 @@ try {
         }
     }
 
-    # Interpret hotkey value
-    switch ($currentHotkey) {
-        "1" { $hotkeyName = "Alt+Shift" }
-        "2" { $hotkeyName = "Ctrl+Shift" }
-        "3" { $hotkeyName = "None (disabled)" }
-        default { $hotkeyName = "Unknown" }
+    # $null = both values absent (or Toggle subkey missing) = Windows default.
+    if ($null -eq $currentHotkey) {
+        $hotkeyName = "Alt+Shift (Windows default — no registry value set)"
+        $isWindowsDefault = $true
+    } else {
+        switch ($currentHotkey) {
+            "1" { $hotkeyName = "Alt+Shift" }
+            "2" { $hotkeyName = "Ctrl+Shift" }
+            "3" { $hotkeyName = "None (disabled)" }
+            default { $hotkeyName = "Unknown" }
+        }
     }
 
     if ($hotkeyName -ne "Unknown" -and $hotkeyName -ne "None (disabled)") {
@@ -127,12 +139,6 @@ try {
 # ==============================================================================
 
 Write-Host "`nWhich hotkey combination would you like to use?" -ForegroundColor Cyan
-
-if ($hotkeyName -eq "Ctrl+Shift" -or $hotkeyName -eq "Alt+Shift") {
-    Write-Host "Detected current hotkey: $hotkeyName" -ForegroundColor Gray
-    Write-Host ""
-}
-
 Write-Host "  [1] Ctrl+Shift" -ForegroundColor White
 Write-Host "      WARNING: Blocks Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+Shift+T, Ctrl+Shift+N, etc." -ForegroundColor Yellow
 Write-Host "  [2] Alt+Shift (Recommended)" -ForegroundColor Green
@@ -241,14 +247,22 @@ if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 }
 
-# Save original hotkey for later restoration during uninstall
-# Don't overwrite if file already exists (reinstall scenario)
+# Persist original state for uninstall to restore. File contents:
+#   "1" / "2"  -> Alt+Shift / Ctrl+Shift
+#   "<unset>"  -> both registry values absent (Windows default)
+# No overwrite on reinstall.
 $originalHotkeyFile = Join-Path $installDir "original_hotkey.txt"
 if (-not (Test-Path $originalHotkeyFile)) {
-    if ($currentHotkey -and $currentHotkey -ne "3") {
-        # Only save if we detected a valid hotkey (not disabled)
+    $valueToSave = $null
+    if ($isWindowsDefault) {
+        $valueToSave = "<unset>"
+    } elseif ($currentHotkey -and $currentHotkey -ne "3") {
+        $valueToSave = $currentHotkey
+    }
+
+    if ($valueToSave) {
         try {
-            $currentHotkey | Out-File -FilePath $originalHotkeyFile -Encoding UTF8 -NoNewline
+            $valueToSave | Out-File -FilePath $originalHotkeyFile -Encoding UTF8 -NoNewline
         } catch {
             Write-Host "[!] Warning: Could not save original hotkey setting" -ForegroundColor Yellow
         }
