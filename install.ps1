@@ -25,7 +25,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 Write-Host "`n=== Stable Language Switch - Installer ===" -ForegroundColor Cyan
-Write-Host "Fixing unreliable Windows keyboard language switching...`n" -ForegroundColor Gray
 
 # ==============================================================================
 # 1. Check for Administrator Privileges
@@ -141,10 +140,13 @@ try {
 Write-Host "`nWhich hotkey combination would you like to use?" -ForegroundColor Cyan
 Write-Host "  [1] Ctrl+Shift" -ForegroundColor White
 Write-Host "      WARNING: Blocks Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+Shift+T, Ctrl+Shift+N, etc." -ForegroundColor Yellow
+Write-Host ""
 Write-Host "  [2] Alt+Shift (Recommended)" -ForegroundColor Green
 Write-Host "      Fewer conflicts with existing shortcuts" -ForegroundColor Gray
+Write-Host ""
 Write-Host "  [3] F1" -ForegroundColor White
 Write-Host "      Single key press, but overrides F1 (Help) in applications" -ForegroundColor Gray
+Write-Host ""
 Write-Host "  [4] CapsLock" -ForegroundColor White
 Write-Host "      Single key press, but disables CapsLock functionality" -ForegroundColor Gray
 Write-Host ""
