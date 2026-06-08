@@ -417,11 +417,5 @@ Write-Host "✓ Can be uninstalled via Settings → Apps" -ForegroundColor White
 Write-Host ""
 Write-Host "Try pressing $scriptName now - language switching should be instant and reliable!" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "The script is running in the background. Look for the AutoHotkey icon" -ForegroundColor Gray
-Write-Host "in your system tray (bottom-right corner)." -ForegroundColor Gray
-Write-Host ""
-Write-Host "To uninstall, go to Settings → Apps → Installed apps" -ForegroundColor Gray
-Write-Host "and search for 'Stable Language Switch'." -ForegroundColor White
-Write-Host ""
 Write-Host "Press Enter to close this window..." -ForegroundColor DarkGray
 Read-Host | Out-Null
